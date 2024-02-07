@@ -1,17 +1,17 @@
-FROM alpine:3.13.1
+FROM alpine:3.18
 
-MAINTAINER 2stacks <2stacks@2stacks.net>
+MAINTAINER fflo
 
-# Use docker build --pull -t 2stacks/freeradius .
+# Use docker build --pull -t fflo/freeradius .
 
 # Image details
-LABEL net.2stacks.name="2stacks" \
-      net.2stacks.license="MIT" \
-      net.2stacks.description="Dockerfile for autobuilds" \
-      net.2stacks.url="http://www.2stacks.net" \
-      net.2stacks.vcs-type="Git" \
-      net.2stacks.version="1.5.1" \
-      net.2stacks.radius.version="3.0.20-r1"
+LABEL net.fflo.name="docker-freeradius" \
+      net.fflo.license="MIT" \
+      net.fflo.description="Dockerfile for autobuilds" \
+      net.fflo.url="https://github.com/fflo/docker-freeradius" \
+      net.fflo.vcs-type="Git" \
+      net.fflo.version="3.0.26.2" \
+      net.fflo.radius.version="3.0.26-r2"
 
 RUN apk --update add freeradius freeradius-mysql freeradius-eap openssl
 

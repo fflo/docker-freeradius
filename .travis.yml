@@ -14,17 +14,17 @@ before_install:
   - docker-compose --version
 
 install:
-  - docker build --pull --no-cache -t 2stacks/freeradius .
+  - docker build --pull --no-cache -t fflo/freeradius .
 
 # Assist with ci test debugging:
 #  - DEBUG=1
 
 before_script:
-  - image="2stacks/freeradius"
+  - image="fflo/freeradius"
   - docker inspect "$image"
 
 script: ./scripts/run-tests.sh
 
-notifications:
-  email:
-    - 2stacks@2stacks.net
+#notifications:
+#  email:
+#    - fflo@...

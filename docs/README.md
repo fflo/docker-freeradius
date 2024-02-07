@@ -2,23 +2,20 @@
 
 This repository builds a FreeRADIUS Docker container using Alpine Linux.  It requires a MySQL database and can be configured with environment variables.
 
-[![Build Status](https://travis-ci.org/2stacks/docker-freeradius.svg?branch=master)](https://travis-ci.org/2stacks/docker-freeradius)
-[![Docker Stars](https://img.shields.io/docker/stars/2stacks/freeradius.svg?style=popout-square)](https://hub.docker.com/r/2stacks/freeradius)
-[![Docker Pulls](https://img.shields.io/docker/pulls/2stacks/freeradius.svg?style=popout-square)](https://hub.docker.com/r/2stacks/freeradius)
-[![Build Details](https://images.microbadger.com/badges/image/2stacks/freeradius.svg)](https://microbadger.com/images/2stacks/freeradius)
+[![Build Status](https://travis-ci.org/fflo/docker-freeradius.svg?branch=master)](https://travis-ci.org/fflo/docker-freeradius)
+[![Docker Stars](https://img.shields.io/docker/stars/fflo/freeradius.svg?style=popout-square)](https://hub.docker.com/r/fflo/freeradius)
+[![Docker Pulls](https://img.shields.io/docker/pulls/fflo/freeradius.svg?style=popout-square)](https://hub.docker.com/r/fflo/freeradius)
+[![Build Details](https://images.microbadger.com/badges/image/fflo/freeradius.svg)](https://microbadger.com/images/fflo/freeradius)
 
 ## Supported tags
 | Tag | Alpine Version | FreeRADIUS Version | Release Date | Changes |
 | --- | :---: | :---: | :---: | :---: |
-| [1.5.1, latest](https://github.com/2stacks/docker-freeradius/blob/master/Dockerfile) | 3.11.0 | 3.0.20-r1 | 2019-12-23 | [Changelog](https://github.com/2stacks/docker-freeradius/compare/v1.5.0...master) |
-| [1.5.0](https://github.com/2stacks/docker-freeradius/blob/v1.5.0/Dockerfile) | 3.10.3 | 3.0.19-r3 | 2019-11-14 | [Changelog](https://github.com/2stacks/docker-freeradius/compare/v1.4.3...v1.5.0) |
-| [1.4.3](https://github.com/2stacks/docker-freeradius/blob/v1.4.3/Dockerfile) | 3.9.4 | 3.0.17-r5 | 2019-06-14 | [Changelog](https://github.com/2stacks/docker-freeradius/compare/v1.4.2...v1.4.3) |
-| [1.4.2](https://github.com/2stacks/docker-freeradius/blob/v1.4.2/Dockerfile) | 3.9.3 | 3.0.17-r4 | 2019-04-12 | [Changelog](https://github.com/2stacks/docker-freeradius/compare/v1.4.1...v1.4.2) |
+| [3.0.26.2, latest](https://github.com/fflo/docker-freeradius/blob/master/Dockerfile) | 3.18.4 | 3.0.26-r2 | 2024-02-08 | [Changelog](https://github.com/fflo/docker-freeradius/compare/v3.0.26.2...master) |
 
 # Running the container
 -   With MySQL
 ```bash
-$ docker run -d -t --name freeradius -p 1812:1812/udp -p 1813:1813/udp -e DB_HOST=<mysql.server> 2stacks/freeradius
+$ docker run -d -t --name freeradius -p 1812:1812/udp -p 1813:1813/udp -e DB_HOST=<mysql.server> fflo/freeradius
 ```
 
 # Environment Variables
@@ -41,7 +38,7 @@ version: '3.2'
 
 services:
   freeradius:
-    image: "2stacks/freeradius"
+    image: "fflo/freeradius"
     ports:
       - "1812:1812/udp"
       - "1813:1813/udp"
@@ -95,13 +92,13 @@ This compose file can be used from within this code repository by executing;
 $ docker-compose up -d
 ```
 
-Note: The example above binds freeradius with a mysql database.  The mysql docker image, associated schema, volumes and configs are not a part of the 2stacks/freeradius image that can be pulled from docker hub.  See .dockerignore file for the parts of this repository that are excluded from the image.
+Note: The example above binds freeradius with a mysql database.  The mysql docker image, associated schema, volumes and configs are not a part of the fflo/freeradius image that can be pulled from docker hub.  See .dockerignore file for the parts of this repository that are excluded from the image.
 
 # Testing Authentication
 The freeradius container can be tested against the mysql backend created in the above compose file using a separate container running the radtest client.
 
 ```bash
-$ docker run -it --rm --network docker-freeradius_backend 2stacks/radtest radtest testing password freeradius 0 testing123
+$ docker run -it --rm --network docker-freeradius_backend fflo/radtest radtest testing password freeradius 0 testing123
 
 Sent Access-Request Id 42 from 0.0.0.0:48898 to 10.0.0.3:1812 length 77
         User-Name = "testing"
@@ -132,7 +129,7 @@ ln -s ../sites-available/default default
 ln -s ../sites-available/inner-tunnel inner-tunnel
 ``` 
 
-See [this thread](https://github.com/2stacks/docker-freeradius/issues/3) for additional information.
+See [this thread](https://github.com/fflo/docker-freeradius/issues/3) for additional information.
 
 # Certificates
 The container has a set of test certificates that are generated each time the container is built using the included Dockerfile.  These certificates are configured with the default settings from the Freeradius package and are set to expire after sixty days.
@@ -143,12 +140,12 @@ From your docker host machine
 
   - Clone the git repository
 ```bash
-$ git clone https://github.com/2stacks/docker-freeradius.git
+$ git clone https://github.com/fflo/docker-freeradius.git
 ```
   - Make changes to the .cnf files in /etc/raddb/certs as needed. (Optional)
   - Run the container
 ```bash
-$ docker run -it --rm -v $PWD/etc/raddb:/etc/raddb 2stacks/freeradius:latest sh
+$ docker run -it --rm -v $PWD/etc/raddb:/etc/raddb fflo/freeradius:latest sh
 ```
 
 From inside the container
