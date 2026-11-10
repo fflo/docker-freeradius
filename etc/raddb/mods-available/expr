@@ -1,6 +1,6 @@
 # -*- text -*-
 #
-#  $Id: 663a9f47b9fac5e43ef6bb165aab31ecbf75d339 $
+#  $Id: 4cecfca478ce1407e487e86f71df8ff637fb365d $
 
 #
 #  This module performs mathematical calculations:
@@ -110,6 +110,11 @@
 #  hmacsha1	generate HMAC-SHA1 of string
 #		"%{hmacsha1:foo bar}" == "85d155c55ed286a300bd1cf124de08d87e914f3a"
 #
+#  crypt	encrypt with a salt: %{crypt:salt:password}
+#		"%{crypt:aa:foo}" == "aaKNIEDOaueR6"
+#		"%{crypt:$1$abcdefgh:foo}" == "$1$abcdefgh$XxzGe9Muun7wTYbZO4sdr0"
+#		"%{crypt:$5$%{randstr:aaaaaaaaaaaaaaaa}:foo}" == "$1$fu4P2fcAdo9gM..."
+#
 #  pairs	serialize attributes as comma-delimited string
 #		"%{pairs:request:}" == "User-Name = 'foo', User-Password = 'bar', ..."
 #
@@ -125,11 +130,17 @@
 #  nexttime	calculate number of seconds until next n hour(s), day(s), week(s), year(s)
 #		if it were 16:18, %{nexttime:1h} would expand to 2520
 #
+#  lasttime	calculate number of seconds until last n hour(s), day(s), week(s), year(s)
+#		if it were 16:18, %{lasttime:1h} would expand to 4680
+#
 #  lpad		left-pad a string
 #		if User-Name is "foo": "%{lpad:&User-Name 6 x}" == "xxxfoo"
 #
 #  rpad		right-pad a string
 #		if User-Name is "foo": "%{rpad:&User-Name 5 -}" == "foo--"
+#
+#  concat 	concatenate a set of attributes, separated by a character.
+#		"%{concat:foo[*] ;}"
 #
 
 expr {

@@ -1,6 +1,43 @@
 ######################################################################
 #
-#  Initial implementation of RADIUS over TLS (radsec)
+#  RADIUS over TLS (radsec)
+#
+#  When a new client connects, the various TLS parameters for the
+#  connection are available as dynamic expansions, e.g.
+#
+#	%{listen:TLS-Client-Cert-Common-Name}
+#
+#  Along with other TLS-Client-Cert-... attributes.
+#  These expansions will only exist if the relevant fields
+#  are in the client certificate.  Read the debug output to see
+#  which fields are available.  Look for output like the following:
+#
+# (0) TLS - Creating attributes from certificate OIDs
+# (0)   TLS-Client-Cert-Subject-Alt-Name-Dns := "one.example.org"
+# (0)   TLS-Client-Cert-Subject-Alt-Name-Dns := "two.example.org"
+# ...
+#
+#  It is also possible to distinguish between connections which have
+#  TLS enables, and ones which do not.  The expansion:
+#
+#	%{listen:tls}
+#
+#  Will return "yes" if the connection has TLS enabled.  It will
+#  return "no" if TLS is not enabled for a particular listen section.
+#
+#  A number of TLS-Client-Cert-.. attributes holds X509v3 extensions
+#  data, attributes named the way OpenSSL names them. It is possible
+#  to extract data for an extension not known to OpenSSL by defining
+#  a custom string attribute which contains extension OID in it's
+#  name after 'TLS-Client-Cert-' prefix. E.g.:
+#
+#  ATTRIBUTE	TLS-Client-Cert-1.3.6.1.4.1.311.21.7	3002	string
+#
+#  which will yield something simmilar to:
+#
+#   (0) eap_tls: TLS - Creating attributes from certificate OIDs
+#   (0) eap_tls:   TLS-Client-Cert-1.3.6.1.4.1.311.21.7 += "0x302e06"
+#   ...
 #
 ######################################################################
 
@@ -15,16 +52,54 @@ listen {
 	#	auth	  = only Access-Request
 	#	acct	  = only Accounting-Request
 	#	auth+acct = both
+	#	coa	  = only CoA / Disconnect requests
 	#
 	type = auth+acct
 
-	# For now, only TCP transport is allowed.
+	#  For now, only TCP transport is allowed.
 	proto = tcp
 
-	# Send packets to the default virtual server
+	#  Send packets to the default virtual server
 	virtual_server = default
 
+	#
+	#  We have clients specifically for TLS.
+	#
 	clients = radsec
+
+	#
+	#  This configuration item should be enabled for all listen
+	#  sections which do TLS.
+	#
+	#  It is only disabled because we are careful about changing
+	#  existing behavior in a stable release.
+	#
+	#  Setting this configuration item to "yes" means that the
+	#  server will be able to gracefully recover if a TLS
+	#  connection is blocking at the network layer.
+	#
+	#  Note that setting "nonblock = yes" is NOT possible for bare
+	#  TCP connections.  RADIUS/TCP should generally be avoided.
+	#
+#	nonblock = yes
+
+	#
+	#  When this is set to "yes", new TLS connections
+	#  are processed through a section called
+	#
+	#	Autz-Type New-TLS-Connection {
+	#		  ...
+	#	}
+	#
+	#  The request contains TLS client certificate attributes,
+	#  and nothing else.  The debug output will print which
+	#  attributes are available on your system.
+	#
+	#  If the section returns "ok" or "updated", then the
+	#  connection is accepted.  Otherwise the connection is
+	#  terminated.
+	#
+#	check_client_connections = yes
 
 	#
 	#  Connection limiting for sockets with "proto = tcp".
@@ -117,13 +192,16 @@ listen {
 		#  this configuration item.
 		ca_file = ${cadir}/ca.pem
 
+		#  For DH cipher suites to work in OpenSSL < 1.1.0,
+		#  you have to run OpenSSL to create the DH file
+		#  first:
 		#
-		#  For DH cipher suites to work, you have to
-		#  run OpenSSL to create the DH file first:
+		#    openssl dhparam -out certs/dh 2048
 		#
-		#  	openssl dhparam -out certs/dh 1024
+		#  For OpenSSL >= 1.1.0, just leave this commented
+		#  out, and OpenSSL will do the right thing.
 		#
-		dh_file = ${certdir}/dh
+	#	dh_file = ${certdir}/dh
 
 		#
 		#  If your system doesn't have /dev/urandom,
@@ -166,6 +244,16 @@ listen {
 	#	check_crl = yes
 		ca_path = ${cadir}
 
+		# OpenSSL does not reload contents of ca_path dir over time.
+		# That means that if check_crl is enabled and CRLs are loaded
+		# from ca_path dir, at some point CRLs will expire and
+		# RADIUSd will stop authenticating NASes.
+		# If ca_path_reload_interval is non-zero, it will force OpenSSL
+		# to reload all data from ca_path periodically
+		#
+		# Flush ca_path each hour
+		ca_path_reload_interval = 3600
+
 	       #
 	       #  If check_cert_issuer is set, the value will
 	       #  be checked against the DN of the issuer in
@@ -192,7 +280,7 @@ listen {
 	       #
 	       #  In 2.1.10 and later, this check can be done
 	       #  more generally by checking the value of the
-	       #  TLS-Client-Cert-CN attribute.  This check
+	       #  TLS-Client-Cert-Common-Name attribute.  This check
 	       #  can be done via any mechanism you choose.
 	       #
 	#	check_cert_cn = %{User-Name}
@@ -209,6 +297,13 @@ listen {
 		# behavior. Having it set to yes is a current best practice
 		# for TLS
 		cipher_server_preference = no
+
+		#
+		#  Older TLS versions are deprecated.  But for RadSec,
+		#  we CAN allow TLS 1.3.
+		#
+		tls_min_version = "1.2"
+		tls_max_version = "1.3"
 
 		#
 		#  Session resumption / fast reauthentication
@@ -293,11 +388,11 @@ listen {
 		      #  should be secured from anyone else. You might want
 		      #  a script to remove old files from here periodically:
 		      #
-		      #    find ${logdir}/tlscache -mtime +2 -exec rm -f {} \;
+		      #    find ${cachedir}/tlscache -mtime +2 -exec rm -f {} \;
 		      #
 		      #  This feature REQUIRES "name" option be set above.
 		      #
-		      #persist_dir = "${logdir}/tlscache"
+		      #persist_dir = "${cachedir}/tlscache"
 		}
 
 		#
@@ -342,6 +437,20 @@ listen {
 			#  returns.
 	#    		client = "/path/to/openssl verify -CApath ${..ca_path} %{TLS-Client-Cert-Filename}"
 		}
+
+		#
+		#  When the RadSec clients use SNI, the server will
+		#  automatically choose the correct certificate from
+		#  "realm_dir".  See raddb/certs/realms/README.md for
+		#  more information.
+		#
+		#  Note that the default is to use the same set of
+		#  realm certificates for both EAP and RadSec!  If
+		#  this is not what you want, you should use different
+		#  subdirectories or each, e.g. ${certdir}/realms/radsec/,
+		#  and ${certdir}/realms/eap/
+		#
+	#	realm_dir = ${certdir}/realms/
 	}
 }
 
@@ -376,15 +485,83 @@ clients radsec {
 	}
 }
 
+#
+#  When a request is proxied to a TLS-enabled home server,
+#  the TLS parameters are available via the expansion:
+#
+#	%{proxy_listen: ... }
+#
+#  The contents of the expansion are the same as described
+#  above with the %{listen: ... } expansion, and have similar
+#  meanings.  "client" in this case is the proxy (this system)
+#  and "server" is the remote system (home server).
+#
+#  Note that the %{proxy_listen: ... } parameters are available
+#  only AFTER the connection has been made to the home server.
+#
 home_server tls {
 	ipaddr = 127.0.0.1
 	port = 2083
+
+	# type can be the same types as for the "listen" section/
+	# e.g. auth, acct, auth+acct, coa
 	type = auth
 	secret = radsec
 	proto = tcp
 	status_check = none
 
+	#
+	#  This configuration item should be enabled for all
+	#  home_server sections which do TLS.
+	#
+	#  It is only disabled because we are careful about changing
+	#  existing behavior in a stable release.
+	#
+	#  Setting this configuration item to "yes" means that the
+	#  server will be able to gracefully recover if a TLS
+	#  connection is blocking at the network layer.
+	#
+	#  Note that setting "nonblock = yes" is NOT possible for bare
+	#  TCP connections.  RADIUS/TCP should generally be avoided.
+	#
+#	nonblock = yes
+
 	tls {
+		#
+		#  Similarly to HTTP, the client can use Server Name
+		#  Indication to inform the RadSec server as to which
+		#  domain it is requesting.  This selection allows
+		#  multiple sites to exist at the same IP address.
+		#
+		#  For example, an identity provider could host
+		#  multiple sites, but present itself with one public
+		#  IP address.  If the RadSec clients do not use SNI,
+		#  then they must be configured with the certificate
+		#  of the identity provider.
+		#
+		#  When SNI is used, the clients can be configured
+		#  with the certificate of the hosted system that
+		#  they're connecting to.  This ability means that
+		#  there is no need to change certificates when
+		#  changing providers.  In addition, there is no need
+		#  to change the configuration of all RadSec clients
+		#  when the hosting system changes its certifiates.
+		#  Because the hosting system certificates are never used.
+		#
+		#  Instead, each hosted company is responsible for its
+		#  own certificates, and for its own clients.
+		#
+		#  SNI also permits the use of a load balancer such as
+		#  haproxy.  That load balancer can terminate the TLS
+		#  connection, and then use SNI to route the
+		#  underlying RADIUS TCP traffic to a particular host.
+		#
+		#  Note that "hostname" here is only for SNI, and is NOT
+		#  the hostname or IP address we connect to.  For that,
+		#  see "ipaddr", above.
+		#
+	#	hostname = "example.com"
+
 		private_key_password = whatever
 		private_key_file = ${certdir}/client.pem
 
@@ -494,7 +671,7 @@ home_server tls {
 	       #
 	       #  In 2.1.10 and later, this check can be done
 	       #  more generally by checking the value of the
-	       #  TLS-Client-Cert-CN attribute.  This check
+	       #  TLS-Client-Cert-Common-Name attribute.  This check
 	       #  can be done via any mechanism you choose.
 	       #
 	#	check_cert_cn = %{User-Name}

@@ -1,5 +1,3 @@
-version: '3.2'
-
 services:
   freeradius:
     image: "fflo/freeradius"
@@ -20,15 +18,15 @@ services:
       - RAD_DEBUG=yes
     depends_on:
       - mysql
-    links:
-      - mysql
     restart: always
     networks:
       - backend
 
   mysql:
-    image: "mysql"
-    command: --default-authentication-plugin=mysql_native_password
+    image: "mysql:8.4"
+    # Only needed for data directories whose accounts were created with
+    # mysql_native_password (the default of older versions of this file).
+    command: --mysql-native-password=ON
     #ports:
       #- "3306:3306"
     volumes:

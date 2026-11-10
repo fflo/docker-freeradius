@@ -1,8 +1,8 @@
 # -*- text -*-
 ##
-## sql.conf -- SQL modules
+## mods-available/sql -- SQL modules
 ##
-##	$Id: 4a59483c35c77f573fb177919e19ba4434cc3da1 $
+##	$Id: 34ec56509f1160f39b408f409b960fcbc0597c92 $
 
 ######################################################################
 #
@@ -15,76 +15,154 @@
 #
 #  Where "DB" is mysql, mssql, oracle, or postgresql.
 #
+#  The name used to query SQL is sql_user_name, which is set in the file
+#
+#     raddb/mods-config/sql/main/${dialect}/queries.conf
+#
+#  If you are using realms, that configuration should be changed to use
+#  the Stripped-User-Name attribute.  See the comments around sql_user_name
+#  for more information.
 #
 
 sql {
-	# The sub-module to use to execute queries. This should match
-	# the database you're attempting to connect to.
 	#
-	#    * rlm_sql_mysql
-	#    * rlm_sql_mssql
-	#    * rlm_sql_oracle
-	#    * rlm_sql_postgresql
-	#    * rlm_sql_sqlite
-	#    * rlm_sql_null (log queries to disk)
+	#  The dialect of SQL being used.
+	#
+	#  Allowed dialects are:
+	#
+	#	mssql
+	#	mysql
+	#	oracle
+	#	postgresql
+	#	sqlite
+	#	mongo
+	#
+	dialect = "mysql"
+
+	#
+	#  The driver module used to execute the queries.  Since we
+	#  don't know which SQL drivers are being used, the default is
+	#  "rlm_sql_null", which just logs the queries to disk via the
+	#  "logfile" directive, below.
+	#
+	#  In order to talk to a real database, delete the next line,
+	#  and uncomment the one after it.
+	#
+	#  If the dialect is "mssql", then the driver should be set to
+	#  one of the following values, depending on your system:
+	#
+	#	rlm_sql_db2
+	#	rlm_sql_firebird
+	#	rlm_sql_freetds
+	#	rlm_sql_iodbc
+	#	rlm_sql_unixodbc
 	#
 	driver = "rlm_sql_mysql"
+#	driver = "rlm_sql_${dialect}"
 
-#
-#	Several drivers accept specific options, to set them, a
-#	config section with the the name as the driver should be added
-#	to the sql instance.
-#
-#	Driver specific options are:
-#
-#	sqlite {
-#		# Path to the sqlite database
-#		filename = "/tmp/freeradius.db"
-#
-#		# How long to wait for write locks on the database to be
-#		# released (in ms) before giving up.
-#		busy_timeout = 200
-#
-#		# If the file above does not exist and bootstrap is set
-#		# a new database file will be created, and the SQL statements
-#		# contained within the bootstrap file will be executed.
-#		bootstrap = "${modconfdir}/${..:name}/main/sqlite/schema.sql"
-# 	}
-#
-#	mysql {
-#		# If any of the files below are set, TLS encryption is enabled
+	#
+	#  Driver-specific subsections.  They will only be loaded and
+	#  used if "driver" is something other than "rlm_sql_null".
+	#  When a real driver is used, the relevant driver
+	#  configuration section is loaded, and all other driver
+	#  configuration sections are ignored.
+	#
+	sqlite {
+		# Path to the sqlite database
+		filename = "${db_dir}/freeradius.db"
+
+		# How long to wait for write locks on the database to be
+		# released (in ms) before giving up.
+		busy_timeout = 200
+
+		# If the file above does not exist and bootstrap is set
+		# a new database file will be created, and the SQL statements
+		# contained within the bootstrap file will be executed.
+		bootstrap = "${modconfdir}/${..:name}/main/sqlite/schema.sql"
+	}
+
+	mysql {
+		# If any of the files below are set, TLS encryption is enabled
+		#
+		# Disabled in this image: the database connection is configured
+		# through the DB_* environment variables only.  Un-comment and
+		# adjust this section to use TLS for the MySQL connection.
+		#
+		# With "tls_required = yes" the certificate of the database
+		# server is verified, so "ca_file" has to contain its CA and
+		# DB_HOST has to match the name in the certificate.
 #		tls {
-#			ca_file = "/etc/ssl/certs/my_ca.crt"
+#			ca_file = "/etc/ssl/certs/ca-certificates.crt"
 #			ca_path = "/etc/ssl/certs/"
 #			certificate_file = "/etc/ssl/certs/private/client.crt"
 #			private_key_file = "/etc/ssl/certs/private/client.key"
 #			cipher = "DHE-RSA-AES256-SHA:AES128-SHA"
+#
+#			tls_required = yes
+#			tls_check_cert = no
+#			tls_check_cert_cn = no
 #		}
-#
-#		# If yes, (or auto and libmysqlclient reports warnings are
-#		# available), will retrieve and log additional warnings from
-#		# the server if an error has occured. Defaults to 'auto'
-#		warnings = auto
-#	}
-#
-#	postgresql {
-#
-#		# unlike MySQL, which has a tls{} connection configuration, postgresql
-#		# uses its connection parameters - see the radius_db option below in
-#		# this file
-#
-#		# Send application_name to the postgres server
-#		# Only supported in PG 9.0 and greater. Defaults to no.
-#		send_application_name = yes
-#	}
-#
 
-	# The dialect of SQL you want to use, this should usually match
-	# the driver you selected above.
+		# If yes, (or auto and libmysqlclient reports warnings are
+		# available), will retrieve and log additional warnings from
+		# the server if an error has occured. Defaults to 'auto'
+		warnings = auto
+	}
+
+	postgresql {
+
+		# unlike MySQL, which has a tls{} connection configuration, postgresql
+		# uses its connection parameters - see the radius_db option below in
+		# this file
+
+		# Send application_name to the postgres server
+		# Only supported in PG 9.0 and greater. Defaults to no.
+		send_application_name = yes
+	}
+
 	#
-	# If you're using rlm_sql_null, then it should be the type of
-	# database the logged queries are going to be executed against.
-	dialect = "mysql"
+	#	Configuration for Mongo.
+	#
+	#	Note that the Mongo driver is experimental.  The FreeRADIUS developers
+	#	are unable to help with the syntax of the Mongo queries.  Please see
+	#	the Mongo documentation for that syntax.
+	#
+	#	The Mongo driver supports only the following methods:
+	#
+	#		aggregate
+	#		findAndModify
+	#		findOne
+	#		insert
+	#
+	#	For examples, see the query files:
+	#
+	#		raddb/mods-config/sql/main/mongo/queries.conf
+	#		raddb/mods-config/sql/main/ippool/queries.conf
+	#
+	#	In order to use findAndModify with an aggretation pipleline, make
+	#	sure that you are running MongoDB version 4.2 or greater. FreeRADIUS
+	#	assumes that the paramaters passed to the methods are supported by the
+	#	version of MongoDB which it is connected to.
+	#
+	mongo {
+		#
+		#  The application name to use.
+		#
+		appname = "freeradius"
+
+		#
+		#  The TLS parameters here map directly to the Mongo TLS configuration
+		#
+		tls {
+			certificate_file = /path/to/file
+			certificate_password = "password"
+			ca_file = /path/to/file
+			ca_dir = /path/to/directory
+			crl_file = /path/to/file
+			weak_cert_validation = false
+			allow_invalid_hostname = false
+		}
+	}
 
 	# Connection info:
 	#
@@ -92,6 +170,18 @@ sql {
 	port = $ENV{DB_PORT}
 	login = $ENV{DB_USER}
 	password = $ENV{DB_PASS}
+
+	# Connection info for Mongo
+	# Authentication Without SSL
+	#	server = "mongodb://USER:PASSWORD@192.16.0.2:PORT/DATABASE?authSource=admin&ssl=false"
+
+	# Authentication With SSL
+	#	server = "mongodb://USER:PASSWORD@192.16.0.2:PORT/DATABASE?authSource=admin&ssl=true"
+
+	# Authentication with Certificate
+	# Use this command for retrieve Derived username:
+	# openssl x509 -in mycert.pem -inform PEM -subject -nameopt RFC2253
+	# server = mongodb://<DERIVED USERNAME>@192.168.0.2:PORT/DATABASE?authSource=$external&ssl=true&authMechanism=MONGODB-X509
 
 	# Database table configuration for everything except Oracle
 	radius_db = $ENV{DB_NAME}
@@ -169,7 +259,7 @@ sql {
 	# connection pool, use "pool = name" instead of a "pool"
 	# section.  e.g.
 	#
-	#	sql1 {
+	#	sql sql1 {
 	#	    ...
 	#	    pool {
 	#	    	 ...
@@ -177,7 +267,7 @@ sql {
 	#	}
 	#
 	#	# sql2 will use the connection pool from sql1
-	#	sql2 {
+	#	sql sql2 {
 	#	     ...
 	#	     pool = sql1
 	#	}
@@ -204,6 +294,23 @@ sql {
 		#
 		#  Setting 'max' to MORE than the number of threads means
 		#  that there are more connections than necessary.
+		#
+		#  The setting here should be lower than the maximum
+		#  number of connections allowed by the database.
+		#
+		#  i.e. There is no point in telling FreeRADIUS to use
+		#  64 connections, while the database is limited to 32
+		#  connections.  That configuration will cause the
+		#  server to be "starved" of connections, and it will
+		#  block during normal operations, even when the
+		#  database is largely idle.
+		#
+		#  At the same time, if the database is slow, there is
+		#  no point in increasing "max".  More connections
+		#  will just cause the database to run more slowly.
+		#  The correct fix for a slow database is to fix it, so
+		#  that it responds to FreeRADIUS quickly.
+		#
 		max = ${thread[pool].max_servers}
 
 		#  Spare connections to be left idle
@@ -242,6 +349,26 @@ sql {
 
 	# Set to 'yes' to read radius clients from the database ('nas' table)
 	# Clients will ONLY be read on server startup.
+	#
+	#  A client can be link to a virtual server via the SQL
+	#  module.  This link is done via the following process:
+	#
+	#  If there is no listener in a virtual server, SQL clients
+	#  are added to the global list for that virtual server.
+	#
+	#  If there is a listener, and the first listener does not
+	#  have a "clients=..." configuration item, SQL clients are
+	#  added to the global list.
+	#
+	#  If there is a listener, and the first one does have a
+	#  "clients=..." configuration item, SQL clients are added to
+	#  that list.  The client { ...} ` configured in that list are
+	#  also added for that listener.
+	#
+	#  The only issue is if you have multiple listeners in a
+	#  virtual server, each with a different client list, then
+	#  the SQL clients are added only to the first listener.
+	#
 	read_clients = yes
 
 	# Table to keep radius client info

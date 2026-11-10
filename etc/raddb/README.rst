@@ -89,6 +89,9 @@ directory.  This change allows for better organization, and means that
 there are fewer files in the main ``raddb`` directory.  See
 ``mods-config/README.rst`` for more details.
 
+On Alpine Linux you can use helper script ``setup-freeradius`` for
+enabling/disabling modules and sites.
+
 Changed Modules
 ---------------
 
@@ -177,7 +180,7 @@ type was ignored by the module.  Now, support for any accounting type
 can be added by just adding a new target, as below.
 
 Queries from v2.x.x may be manually copied to the new v3.0
-``dialup.conf`` file (``raddb/sql/main/<dialect>/queries.conf``).
+``dialup.conf`` file (``raddb/mods-config/sql/main/<dialect>/queries.conf``).
 When doing this you may also need to update references to the
 accounting tables, as their definitions will now be outside of
 the subsection containing the query.

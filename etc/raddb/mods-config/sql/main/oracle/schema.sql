@@ -1,5 +1,5 @@
 /*
- * $Id: d70cc522d1266eb92c7013c5a326dc6d89c7a05c $
+ * $Id: 96cde18d1c42057dfff65df9fff5f664790c4fcb $
  *
  * Oracle schema for FreeRADIUS
  *
@@ -15,7 +15,7 @@ CREATE TABLE radacct (
 	acctsessionid		VARCHAR(96) NOT NULL,
 	acctuniqueid		VARCHAR(32),
 	username		VARCHAR(64) NOT NULL,
-	realm			VARCHAR(30),
+	realm			VARCHAR(64),
 	nasipaddress		VARCHAR(15) NOT NULL,
 	nasportid		VARCHAR(32),
 	nasporttype		VARCHAR(32),
@@ -23,8 +23,8 @@ CREATE TABLE radacct (
 	acctstoptime		TIMESTAMP WITH TIME ZONE,
 	acctsessiontime		NUMERIC(19),
 	acctauthentic		VARCHAR(32),
-	connectinfo_start	VARCHAR(50),
-	connectinfo_stop	VARCHAR(50),
+	connectinfo_start	VARCHAR(128),
+	connectinfo_stop	VARCHAR(128),
 	acctinputoctets		NUMERIC(19),
 	acctoutputoctets	NUMERIC(19),
 	calledstationid		VARCHAR(50),
@@ -33,16 +33,23 @@ CREATE TABLE radacct (
 	servicetype		VARCHAR(32),
 	framedprotocol		VARCHAR(32),
 	framedipaddress		VARCHAR(15),
+	framedipv6address	VARCHAR(45),
+	framedipv6prefix	VARCHAR(45),
+	framedinterfaceid	VARCHAR(44),
+	delegatedipv6prefix	VARCHAR(45),
 	acctstartdelay		NUMERIC(12),
 	acctstopdelay		NUMERIC(12),
-	XAscendSessionSvrKey	VARCHAR(10)
+	XAscendSessionSvrKey	VARCHAR(10),
+	Class			VARCHAR(64)
 );
 
 CREATE UNIUQE INDEX radacct_idx0
 	ON radacct(acctuniqueid);
 CREATE UNIQUE INDEX radacct_idx1
 	ON radacct(acctsessionid,username,acctstarttime,
-		acctstoptime,nasipaddress,framedipaddress);
+		acctstoptime,nasipaddress,framedipaddress,framedipv6address,framedipv6prefix,framedinterfaceid,delegatedipv6prefix);
+CREATE INDEX radacct_idx2
+	ON radacct(class);
 
 CREATE SEQUENCE radacct_seq START WITH 1 INCREMENT BY 1;
 
@@ -155,8 +162,13 @@ CREATE TABLE radpostauth (
 	  UserName      VARCHAR(64) NOT NULL,
 	  Pass          VARCHAR(64),
 	  Reply         VARCHAR(64),
-	  AuthDate 	DATE
+	  AuthDate 	TIMESTAMP(6) WITH TIME ZONE,
+	  Class		VARCHAR(64)
 );
+CREATE INDEX radpostauth_idx0
+	ON radpostauth(UserName);
+CREATE INDEX radpostauth_idx1
+	ON radpostauth(class);
 
 CREATE SEQUENCE radpostauth_seq START WITH 1 INCREMENT BY 1;
 
@@ -168,7 +180,7 @@ CREATE OR REPLACE TRIGGER radpostauth_TRIG
 			SELECT radpostauth_seq.nextval into :new.id from dual;
 		end if;
 		if (:new.AuthDate is null) then
-		  select sysdate into :new.AuthDate from dual;
+		  select systimestamp into :new.AuthDate from dual;
 		end if;
 	END;
 

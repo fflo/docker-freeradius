@@ -4,7 +4,7 @@
 #	This is a virtual server that handles *only* inner tunnel
 #	requests for EAP-TTLS and PEAP types.
 #
-#	$Id: 70b1d8da255a740d2d1b59808393722766dc6a60 $
+#	$Id: 10eeb55db7a1129ea62f2195c17b286eb4acd1d2 $
 #
 ######################################################################
 
@@ -89,11 +89,8 @@ authorize {
 #	IPASS
 
 	#
-	#  If you are using multiple kinds of realms, you probably
-	#  want to set "ignore_null = yes" for all of them.
-	#  Otherwise, when the first style of realm doesn't match,
-	#  the other styles won't be checked.
-	#
+	#  Look for realms in user@domain format
+	# 
 	#  Note that proxying the inner tunnel authentication means
 	#  that the user MAY use one identity in the outer session
 	#  (e.g. "anonymous", and a different one here
@@ -131,7 +128,7 @@ authorize {
 	#  for the many packets that go back and forth to set up TTLS
 	#  or PEAP.  The load on those servers will therefore be reduced.
 	#
-	eap {
+	-eap {
 		ok = return
 	}
 
@@ -143,7 +140,7 @@ authorize {
 	#  Look in an SQL database.  The schema of the database
 	#  is meant to mirror the "users" file.
 	#
-	#  See "Authorization Queries" in sql.conf
+	#  See "Authorization Queries" in `mods-config/sql/main/$driver/queries.conf`
 	-sql
 
 	#
@@ -247,7 +244,7 @@ authenticate {
 
 	#
 	#  Allow EAP authentication.
-	eap
+	-eap
 }
 
 ######################################################################
@@ -265,7 +262,7 @@ session {
 	radutmp
 
 	#
-	#  See "Simultaneous Use Checking Queries" in sql.conf
+	#  See "Simultaneous Use Checking Queries" in `mods-config/sql/main/$driver/queries.conf`
 #	sql
 }
 
@@ -290,6 +287,14 @@ post-auth {
 #       cui-inner
 
 	#
+	#  If you want the Access-Accept to contain the inner
+	#  User-Name, uncomment the following lines.
+	#
+#	update outer.session-state {
+#	       User-Name := &User-Name
+#	}
+
+	#
 	#  If you want to have a log of authentication replies,
 	#  un-comment the following line, and enable the
 	#  'detail reply_log' module.
@@ -298,12 +303,12 @@ post-auth {
 	#
 	#  After authenticating the user, do another SQL query.
 	#
-	#  See "Authentication Logging Queries" in sql.conf
+	#  See "Authentication Logging Queries" in `mods-config/sql/main/$driver/queries.conf`
 	-sql
 
 	#
 	#  Un-comment the following if you have set
-	#  'edir_account_policy_check = yes' in the ldap module sub-section of
+	#  'edir = yes' in the ldap module sub-section of
 	#  the 'modules' section.
 	#
 #	ldap
@@ -360,7 +365,7 @@ post-auth {
 	#  post-auth section.
 	#
 	#  Add the ldap module name (or instance) if you have set
-	#  'edir_account_policy_check = yes' in the ldap module configuration
+	#  'edir = yes' in the ldap module configuration
 	#
 	Post-Auth-Type REJECT {
 		# log failed authentications in SQL, too.
@@ -427,7 +432,7 @@ post-proxy {
 	#  hidden inside of the EAP packet, and the end server will
 	#  reject the EAP request.
 	#
-	eap
+	-eap
 }
 
 } # inner-tunnel server block

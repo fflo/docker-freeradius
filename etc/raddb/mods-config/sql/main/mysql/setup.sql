@@ -3,16 +3,15 @@
 ## admin.sql -- MySQL commands for creating the RADIUS user.
 ##
 ##	WARNING: You should change 'localhost' and 'radpass'
-##		 to something else.  Also update raddb/sql.conf
+##		 to something else.  Also update raddb/mods-available/sql
 ##		 with the new RADIUS password.
 ##
-##	$Id: aff0505a473c67b65cfc19fae079454a36d4e119 $
+##	$Id: cd44117def3283fd94e0b956a52c67bebfde529a $
 
 #
 #  Create default administrator for RADIUS
 #
-CREATE USER 'radius'@'localhost';
-SET PASSWORD FOR 'radius'@'localhost' = PASSWORD('radpass');
+CREATE USER 'radius'@'localhost' IDENTIFIED BY 'radpass';
 
 # The server can read any table in SQL
 GRANT SELECT ON radius.* TO 'radius'@'localhost';

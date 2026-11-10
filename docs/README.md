@@ -2,15 +2,14 @@
 
 This repository builds a FreeRADIUS Docker container using Alpine Linux.  It requires a MySQL database and can be configured with environment variables.
 
-[![Build Status](https://travis-ci.org/fflo/docker-freeradius.svg?branch=master)](https://travis-ci.org/fflo/docker-freeradius)
+[![CI](https://github.com/fflo/docker-freeradius/actions/workflows/ci.yml/badge.svg)](https://github.com/fflo/docker-freeradius/actions/workflows/ci.yml)
 [![Docker Stars](https://img.shields.io/docker/stars/fflo/freeradius.svg?style=popout-square)](https://hub.docker.com/r/fflo/freeradius)
 [![Docker Pulls](https://img.shields.io/docker/pulls/fflo/freeradius.svg?style=popout-square)](https://hub.docker.com/r/fflo/freeradius)
-[![Build Details](https://images.microbadger.com/badges/image/fflo/freeradius.svg)](https://microbadger.com/images/fflo/freeradius)
 
 ## Supported tags
 | Tag | Alpine Version | FreeRADIUS Version | Release Date | Changes |
 | --- | :---: | :---: | :---: | :---: |
-| [3.0.26.2, latest](https://github.com/fflo/docker-freeradius/blob/master/Dockerfile) | 3.18.4 | 3.0.26-r2 | 2024-02-08 | [Changelog](https://github.com/fflo/docker-freeradius/compare/v3.0.26.2...master) |
+| [3.0.27.3, latest](https://github.com/fflo/docker-freeradius/blob/master/Dockerfile) | 3.24 | 3.0.27-r3 | 2026-11-10 | [Changelog](https://github.com/fflo/docker-freeradius/compare/3.0.26.2...master) |
 
 # Running the container
 -   With MySQL
@@ -28,14 +27,19 @@ $ docker run -d -t --name freeradius -p 1812:1812/udp -p 1813:1813/udp -e DB_HOS
 -   RADIUS_KEY=testing123
 -   RAD_CLIENTS=10.0.0.0/24
 -   RAD_DEBUG=no
+-   MARIADB_TLS_DISABLE_PEER_VERIFICATION=1 (see "Database connection and TLS" below)
+
+# Database connection and TLS
+
+By default the connection to the database is not encrypted and the certificate of the database server is not verified, as in earlier versions of this image.  The MariaDB client library used by FreeRADIUS would otherwise verify the server certificate by default and refuse the self-signed certificate of a stock MySQL server (`TLS/SSL error: self-signed certificate in certificate chain`); the image sets `MARIADB_TLS_DISABLE_PEER_VERIFICATION=1` to keep the previous behaviour.
+
+To encrypt the connection and verify the database server, un-comment the `tls` section in `etc/raddb/mods-available/sql`, set `tls_required = yes` and point `ca_file` to the CA of your database server.
 
 # Docker Compose Example
 
 You can use the included docker-compose.yml file to test Freeradius and MySQL integration:
 
 ```yaml
-version: '3.2'
-
 services:
   freeradius:
     image: "fflo/freeradius"
@@ -56,15 +60,15 @@ services:
       - RAD_DEBUG=yes
     depends_on:
       - mysql
-    links:
-      - mysql
     restart: always
     networks:
       - backend
 
   mysql:
-    image: "mysql"
-    command: --default-authentication-plugin=mysql_native_password
+    image: "mysql:8.4"
+    # Only needed for data directories whose accounts were created with
+    # mysql_native_password (the default of older versions of this file).
+    command: --mysql-native-password=ON
     ports:
       - "3306:3306"
     volumes:
@@ -89,7 +93,7 @@ networks:
 
 This compose file can be used from within this code repository by executing;
 ```bash
-$ docker-compose up -d
+$ docker compose up -d
 ```
 
 Note: The example above binds freeradius with a mysql database.  The mysql docker image, associated schema, volumes and configs are not a part of the fflo/freeradius image that can be pulled from docker hub.  See .dockerignore file for the parts of this repository that are excluded from the image.
@@ -98,7 +102,8 @@ Note: The example above binds freeradius with a mysql database.  The mysql docke
 The freeradius container can be tested against the mysql backend created in the above compose file using a separate container running the radtest client.
 
 ```bash
-$ docker run -it --rm --network docker-freeradius_backend fflo/radtest radtest testing password freeradius 0 testing123
+$ docker run -it --rm --network docker-freeradius_backend alpine:3.24 \
+    sh -c 'apk add --no-cache -q freeradius-utils && radtest testing password freeradius 0 testing123'
 
 Sent Access-Request Id 42 from 0.0.0.0:48898 to 10.0.0.3:1812 length 77
         User-Name = "testing"
@@ -112,7 +117,23 @@ Received Access-Accept Id 42 from 10.0.0.3:1812 to 0.0.0.0:0 length 20
 
 Note: The username and password used in the radtest example above are pre-loaded in the mysql database by the radius.sql schema included in this repository.  The preconfigured mysql database is for validating freeradius functionality only and not intended for production use.
 
-A default SQL schema for FreeRadius on MySQL can be found [here](https://github.com/FreeRADIUS/freeradius-server/blob/master/raddb/mods-config/sql/main/mysql/schema.sql).
+A default SQL schema for FreeRadius on MySQL can be found [here](https://github.com/FreeRADIUS/freeradius-server/blob/v3.0.x/raddb/mods-config/sql/main/mysql/schema.sql).
+
+# Upgrading from 3.0.26.x
+
+The configuration in `etc/raddb` now matches the FreeRADIUS 3.0.27 defaults (it was based on 3.0.17 before), with the same customizations as before: database and client settings from environment variables, logging to stdout, SQL enabled in the default virtual server and proxying disabled.  If you bind mount your own copies of files from `etc/raddb`, compare them with the new versions.
+
+-   **BlastRADIUS (CVE-2024-3596):** the server now adds `Message-Authenticator` to its replies and uses `require_message_authenticator = auto` and `limit_proxy_state = auto`.  Once all of your NAS devices send `Message-Authenticator`, set `require_message_authenticator = yes` for them in `clients.conf`.  See the [FreeRADIUS security notice](https://www.freeradius.org/security/).
+-   **EAP/TLS:** the defaults now only allow TLS 1.2 (`tls_min_version` / `tls_max_version` in `mods-available/eap`), and LEAP is no longer available.
+-   **Accounting schema:** the accounting queries write the columns `framedipv6address`, `framedipv6prefix`, `framedinterfaceid` and `delegatedipv6prefix` of `radacct`.  Databases created from the `radius.sql` of this repository already have them.  If your `radacct` table does not, add them:
+```sql
+ALTER TABLE radacct
+  ADD COLUMN framedipv6address varchar(45) NOT NULL default '' AFTER framedipaddress,
+  ADD COLUMN framedipv6prefix varchar(45) NOT NULL default '' AFTER framedipv6address,
+  ADD COLUMN framedinterfaceid varchar(44) NOT NULL default '' AFTER framedipv6prefix,
+  ADD COLUMN delegatedipv6prefix varchar(45) NOT NULL default '' AFTER framedinterfaceid;
+```
+-   **MySQL:** the compose example uses MySQL 8.4.  The `--default-authentication-plugin` option no longer exists there; new accounts use `caching_sha2_password`.
 
 # Build the container
 If you would like to make modifications or customizations, clone this repository, make your changes and then run the following from the root of the repository.

@@ -2,12 +2,12 @@
 #
 #  The database schemas are available at:
 #
-#       raddb/sql/ippool/<DB>/schema.sql
+#       raddb/mods-config/sql/ippool/<DB>/schema.sql
 #
-#  $Id: 435921fb297812c11060859ce1066248ef53c4df $
+#  $Id: 3d98ca9e0fca4f8df2657d53a15a2c52756b45e1 $
 
 sqlippool {
-	# SQL instance to use (from sql.conf)
+	# SQL instance to use (from mods-available/sql)
 	#
 	#  If you have multiple sql instances, such as "sql sql1 {...}",
 	#  use the *instance* name here: sql1.
@@ -18,11 +18,25 @@ sqlippool {
 	#  reference expansions.
 	dialect = "mysql"
 
+	# Name of the check item attribute to be used as a key in the SQL queries
+	pool_name = "Pool-Name"
+
 	# SQL table to use for ippool range and lease info
 	ippool_table = "radippool"
 
 	# IP lease duration. (Leases expire even if Acct Stop packet is lost)
+	#
+	#  Note that you SHOULD also set Session-Timeout to this value!
+	#  That way the NAS will automatically kick the user offline when the
+	#  lease expires.
+	#
 	lease_duration = 3600
+
+	#
+	# Timeout between each consecutive 'allocate_clear' queries (default: 1s)
+	# This will avoid having too many deadlock issues, especially on MySQL backend.
+	#
+	allocate_clear_timeout = 1
 
 	#
 	#  As of 3.0.16, the 'ipv6 = yes' configuration is deprecated.
@@ -57,6 +71,9 @@ sqlippool {
 	#
 #	allow_duplicates = no
 
+	#  The attribute in which an IP address hint may be supplied
+	req_attribute_name = Framed-IP-Address
+
 	# Attribute which should be considered unique per NAS
 	#
 	#  Using NAS-Port gives behaviour similar to rlm_ippool. (And ACS)
@@ -85,13 +102,13 @@ sqlippool {
 	messages {
 		exists = "Existing IP: %{reply:${..attribute_name}} (did %{Called-Station-Id} cli %{Calling-Station-Id} port %{NAS-Port} user %{User-Name})"
 
-		success = "Allocated IP: %{reply:${..attribute_name}} from %{control:Pool-Name} (did %{Called-Station-Id} cli %{Calling-Station-Id} port %{NAS-Port} user %{User-Name})"
+		success = "Allocated IP: %{reply:${..attribute_name}} from %{control:${..pool_name}} (did %{Called-Station-Id} cli %{Calling-Station-Id} port %{NAS-Port} user %{User-Name})"
 
-		clear = "Released IP ${..attribute_name} (did %{Called-Station-Id} cli %{Calling-Station-Id} user %{User-Name})"
+		clear = "Released IP %{request:${..attribute_name}} (did %{Called-Station-Id} cli %{Calling-Station-Id} user %{User-Name})"
 
-		failed = "IP Allocation FAILED from %{control:Pool-Name} (did %{Called-Station-Id} cli %{Calling-Station-Id} port %{NAS-Port} user %{User-Name})"
+		failed = "IP Allocation FAILED from %{control:${..pool_name}} (did %{Called-Station-Id} cli %{Calling-Station-Id} port %{NAS-Port} user %{User-Name})"
 
-		nopool = "No Pool-Name defined (did %{Called-Station-Id} cli %{Calling-Station-Id} port %{NAS-Port} user %{User-Name})"
+		nopool = "No ${..pool_name} defined (did %{Called-Station-Id} cli %{Calling-Station-Id} port %{NAS-Port} user %{User-Name})"
 	}
 
 	$INCLUDE ${modconfdir}/sql/ippool/${dialect}/queries.conf
