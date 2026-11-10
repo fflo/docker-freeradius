@@ -2,6 +2,8 @@
 
 This repository builds a FreeRADIUS Docker container using Alpine Linux.  It requires a MySQL database and can be configured with environment variables.
 
+Images for `linux/amd64` and `linux/arm64` are built, tested and pushed to [Docker Hub](https://hub.docker.com/r/fflo/freeradius) by GitHub Actions: `latest` from the `master` branch, and one image tag per git tag.
+
 [![CI](https://github.com/fflo/docker-freeradius/actions/workflows/ci.yml/badge.svg)](https://github.com/fflo/docker-freeradius/actions/workflows/ci.yml)
 [![Docker Stars](https://img.shields.io/docker/stars/fflo/freeradius.svg?style=popout-square)](https://hub.docker.com/r/fflo/freeradius)
 [![Docker Pulls](https://img.shields.io/docker/pulls/fflo/freeradius.svg?style=popout-square)](https://hub.docker.com/r/fflo/freeradius)
