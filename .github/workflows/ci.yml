@@ -105,7 +105,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      # master -> fflo/freeradius:latest, git tag X -> fflo/freeradius:X
+      # This job only runs for master and for git tags:
+      #   master    -> fflo/freeradius:latest
+      #   git tag X -> fflo/freeradius:X and fflo/freeradius:latest
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v6
@@ -113,7 +115,7 @@ jobs:
           images: ${{ env.IMAGE }}
           flavor: latest=false
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest
             type=ref,event=tag
 
       - name: Log in to Docker Hub

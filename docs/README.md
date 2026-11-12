@@ -2,16 +2,16 @@
 
 This repository builds a FreeRADIUS Docker container using Alpine Linux.  It requires a MySQL database and can be configured with environment variables.
 
-Images for `linux/amd64` and `linux/arm64` are built, tested and pushed to [Docker Hub](https://hub.docker.com/r/fflo/freeradius) by GitHub Actions: `latest` from the `master` branch, and one image tag per git tag.
+Images for `linux/amd64` and `linux/arm64` are built, tested and pushed to [Docker Hub](https://hub.docker.com/r/fflo/freeradius) by GitHub Actions.  Every push to the `master` branch updates `latest`; a git tag publishes an image tag of the same name and also updates `latest`.
 
 [![CI](https://github.com/fflo/docker-freeradius/actions/workflows/ci.yml/badge.svg)](https://github.com/fflo/docker-freeradius/actions/workflows/ci.yml)
-[![Docker Stars](https://img.shields.io/docker/stars/fflo/freeradius.svg?style=popout-square)](https://hub.docker.com/r/fflo/freeradius)
-[![Docker Pulls](https://img.shields.io/docker/pulls/fflo/freeradius.svg?style=popout-square)](https://hub.docker.com/r/fflo/freeradius)
+[![Docker Stars](https://img.shields.io/docker/stars/fflo/freeradius.svg?style=flat-square)](https://hub.docker.com/r/fflo/freeradius)
+[![Docker Pulls](https://img.shields.io/docker/pulls/fflo/freeradius.svg?style=flat-square)](https://hub.docker.com/r/fflo/freeradius)
 
 ## Supported tags
 | Tag | Alpine Version | FreeRADIUS Version | Release Date | Changes |
 | --- | :---: | :---: | :---: | :---: |
-| [3.0.27.3, latest](https://github.com/fflo/docker-freeradius/blob/master/Dockerfile) | 3.24 | 3.0.27-r3 | 2026-11-10 | [Changelog](https://github.com/fflo/docker-freeradius/compare/3.0.26.2...master) |
+| [3.0.27.3, latest](https://github.com/fflo/docker-freeradius/blob/master/Dockerfile) | 3.24 | 3.0.27-r3 | 2026-11-10 | [Changelog](https://github.com/fflo/docker-freeradius/compare/3.0.26.2...3.0.27.3) |
 
 # Running the container
 -   With MySQL
@@ -19,17 +19,25 @@ Images for `linux/amd64` and `linux/arm64` are built, tested and pushed to [Dock
 $ docker run -d -t --name freeradius -p 1812:1812/udp -p 1813:1813/udp -e DB_HOST=<mysql.server> fflo/freeradius
 ```
 
+Set `RAD_CLIENTS` to the network your RADIUS clients (NAS devices) connect from and `RADIUS_KEY` to their shared secret; requests from other addresses are ignored.  Additional clients can be defined in the `nas` table of the database, which is read when the server starts.
+
+On startup the container waits up to 15 seconds for the database port and exits if it cannot be reached, so run it with a restart policy if the database may start later.
+
 # Environment Variables
 
--   DB_HOST=localhost
--   DB_PORT=3306
--   DB_USER=radius
--   DB_PASS=radpass
--   DB_NAME=radius
--   RADIUS_KEY=testing123
--   RAD_CLIENTS=10.0.0.0/24
--   RAD_DEBUG=no
--   MARIADB_TLS_DISABLE_PEER_VERIFICATION=1 (see "Database connection and TLS" below)
+| Variable | Default | Description |
+| --- | --- | --- |
+| DB_HOST | localhost | Host name or address of the MySQL server |
+| DB_PORT | 3306 | Port of the MySQL server |
+| DB_USER | radius | Database user |
+| DB_PASS | radpass | Database password |
+| DB_NAME | radius | Database name |
+| RADIUS_KEY | testing123 | Shared secret of the RADIUS clients; change it for anything but tests |
+| RAD_CLIENTS | 10.0.0.0/24 | Network (CIDR notation) the RADIUS clients connect from |
+| RAD_DEBUG | no | See below |
+| MARIADB_TLS_DISABLE_PEER_VERIFICATION | 1 | See "Database connection and TLS" below |
+
+`RAD_DEBUG=yes` runs FreeRADIUS in debug mode (`radiusd -X`), logs authentication requests including the passwords, and records every authentication attempt in the `radpostauth` table.  With `RAD_DEBUG=no`, nothing is written to `radpostauth`, and accounting requests that carry a `Calling-Station-Id` get that attribute and `NAS-IP-Address` replaced by `1.1.1.1` before they are stored.
 
 # Database connection and TLS
 
@@ -45,9 +53,9 @@ You can use the included docker-compose.yml file to test Freeradius and MySQL in
 services:
   freeradius:
     image: "fflo/freeradius"
-    ports:
-      - "1812:1812/udp"
-      - "1813:1813/udp"
+    #ports:
+      #- "1812:1812/udp"
+      #- "1813:1813/udp"
     #volumes:
       #- "./configs/radius/users:/etc/raddb/users"
       #- "./configs/radius/clients.conf:/etc/raddb/clients.conf"
@@ -71,8 +79,8 @@ services:
     # Only needed for data directories whose accounts were created with
     # mysql_native_password (the default of older versions of this file).
     command: --mysql-native-password=ON
-    ports:
-      - "3306:3306"
+    #ports:
+      #- "3306:3306"
     volumes:
       - "./configs/mysql/master/data:/var/lib/mysql"
       #- "./configs/mysql/master/conf.d:/etc/mysql/conf.d"
@@ -101,20 +109,20 @@ $ docker compose up -d
 Note: The example above binds freeradius with a mysql database.  The mysql docker image, associated schema, volumes and configs are not a part of the fflo/freeradius image that can be pulled from docker hub.  See .dockerignore file for the parts of this repository that are excluded from the image.
 
 # Testing Authentication
-The freeradius container can be tested against the mysql backend created in the above compose file using a separate container running the radtest client.
+The freeradius container can be tested against the mysql backend created in the above compose file using a separate container running the radtest client.  The network name below assumes the repository was cloned into a directory named `docker-freeradius`.
 
 ```bash
 $ docker run -it --rm --network docker-freeradius_backend alpine:3.24 \
     sh -c 'apk add --no-cache -q freeradius-utils && radtest testing password freeradius 0 testing123'
 
-Sent Access-Request Id 42 from 0.0.0.0:48898 to 10.0.0.3:1812 length 77
+Sent Access-Request Id 90 from 0.0.0.0:42848 to 10.0.0.3:1812 length 77
         User-Name = "testing"
         User-Password = "password"
         NAS-IP-Address = 10.0.0.4
         NAS-Port = 0
-        Message-Authenticator = 0x00
         Cleartext-Password = "password"
-Received Access-Accept Id 42 from 10.0.0.3:1812 to 0.0.0.0:0 length 20
+Received Access-Accept Id 90 from 10.0.0.3:1812 to 10.0.0.4:42848 length 38
+        Message-Authenticator = 0x820517de4b333d0c4d2b9b49dd6b04c2
 ```
 
 Note: The username and password used in the radtest example above are pre-loaded in the mysql database by the radius.sql schema included in this repository.  The preconfigured mysql database is for validating freeradius functionality only and not intended for production use.
@@ -152,11 +160,11 @@ ln -s ../sites-available/default default
 ln -s ../sites-available/inner-tunnel inner-tunnel
 ``` 
 
-See [this thread](https://github.com/fflo/docker-freeradius/issues/3) for additional information.
+See [this thread](https://github.com/2stacks/docker-freeradius/issues/3) for additional information.
 
 # Certificates
-The container has a set of test certificates that are generated each time the container is built using the included Dockerfile.  These certificates are configured with the default settings from the Freeradius package and are set to expire after sixty days.
-These certificates are not meant to be used in production and should be recreated/replaced as needed.  Follow the steps below to generate new certificates.  It is important that you read and understand the instructions in '/etc/raddb/certs/README'
+The container has a set of test certificates that are generated each time the container is built using the included Dockerfile.  These certificates are configured with the default settings from the Freeradius package and are set to expire after sixty days.  The image on Docker Hub contains the certificates and private keys of its build, so everyone who pulls it has the same keys.
+These certificates are not meant to be used in production and should be recreated/replaced as needed.  Follow the steps below to generate new certificates.  It is important that you read and understand the instructions in '/etc/raddb/certs/README.md'
   
 #### Generate new certs
 From your docker host machine
@@ -184,5 +192,5 @@ From inside the container
 You can bind mount these certificates back in to the container or rebuild the container as mentioned above.
 You'll have to change the permissions to your local user before rebuilding the container.
 ```bash
-$ sudo chown -R $USER:$USER etc/raddb/certs
+$ sudo chown -R "$(id -u):$(id -g)" etc/raddb/certs
 ```
